@@ -56,7 +56,15 @@ export async function scheduleSequence(opts: ScheduleOpts): Promise<ScheduleResu
         await sendQueue.add(
           'send',
           { scheduledEmailId: result.insertId },
-          { delay, jobId: `se-${result.insertId}` },
+          {
+            delay,
+            jobId: `se-${result.insertId}`,
+            attempts: 3,
+            backoff: {
+              delay: 5000,
+              type: "exponential"
+            }
+          },
         );
         scheduled++;
       } catch (err) {

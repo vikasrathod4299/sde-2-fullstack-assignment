@@ -103,16 +103,12 @@ export async function processSendJob(job: Job<SendJob>): Promise<void> {
       [row.id, row.mailbox_id, 'sent', 'Email dispatched'],
     );
 
+    return;
   } catch (err) {
     const message = (err as Error).message;
     await pool.execute(
-      "UPDATE scheduled_emails SET status='failed', last_error=? WHERE id = ?",
+      "UPDATE scheduled_emails SET status='pending', last_error=? WHERE id=?",
       [message, row.id],
-    );
-
-    await pool.execute(
-      'insert into send_logs (scheduled_email_id, mailbox_id, status, message) values (?, ?, ?, ?)',
-      [row.id, row.mailbox_id, 'failed', message],
     );
     throw err;
   }
