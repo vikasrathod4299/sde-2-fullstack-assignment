@@ -78,10 +78,11 @@ export async function processSendJob(job: Job<SendJob>): Promise<void> {
     return;
   }
 
-  await pool.execute(
+  const [result] = await pool.execute<ResultSetHeader>(
     "UPDATE scheduled_emails SET status='processing', attempts = attempts + 1 WHERE id = ? AND status = 'pending'",
     [row.id],
   );
+  if (result.affectedRows === 0) result;
 
   const check = await checkAndIncrement(row.mailbox_id);
   if (!check.allowed) {
