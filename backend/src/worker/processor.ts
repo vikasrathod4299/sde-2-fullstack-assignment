@@ -25,6 +25,7 @@ interface JoinedRow extends RowDataPacket {
 }
 
 export async function processSendJob(job: Job<SendJob>): Promise<void> {
+  console.log("hello world")
   const { scheduledEmailId } = job.data;
 
   const [rows] = await pool.execute<JoinedRow[]>(
@@ -48,9 +49,11 @@ export async function processSendJob(job: Job<SendJob>): Promise<void> {
     console.warn(`[worker] scheduled_email ${scheduledEmailId} not found`);
     return;
   }
+
   if (row.status !== 'pending') {
     return;
   }
+
   if (row.prospect_status !== 'active') {
     await pool.execute(
       "UPDATE scheduled_emails SET status='skipped' WHERE id=?",
@@ -64,7 +67,7 @@ export async function processSendJob(job: Job<SendJob>): Promise<void> {
   }
 
   await pool.execute(
-    "UPDATE scheduled_emails SET status='processing', attempts = attempts + 1 WHERE id = ?",
+    "UPDATE scheduled_emails SET status='processing', attempts = attempts + 1 WHERE id = ? AND status = 'pending'",
     [row.id],
   );
 
