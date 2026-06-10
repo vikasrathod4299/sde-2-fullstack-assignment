@@ -82,7 +82,7 @@ export async function processSendJob(job: Job<SendJob>): Promise<void> {
     "UPDATE scheduled_emails SET status='processing', attempts = attempts + 1 WHERE id = ? AND status = 'pending'",
     [row.id],
   );
-  if (result.affectedRows === 0) result;
+  if (result.affectedRows === 0) return;
 
   const check = await checkAndIncrement(row.mailbox_id);
   if (!check.allowed) {
