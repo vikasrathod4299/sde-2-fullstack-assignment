@@ -2,7 +2,7 @@ import type { Job } from 'bullmq';
 import { pool } from '../config/db';
 import { checkAndIncrement } from '../mailboxes/rateLimiter';
 import { send } from './smtpAdapter';
-import type { RowDataPacket } from 'mysql2';
+import type { ResultSetHeader, RowDataPacket } from 'mysql2';
 
 interface SendJob {
   scheduledEmailId: number;
@@ -56,6 +56,10 @@ export async function processSendJob(job: Job<SendJob>): Promise<void> {
 
   if (row.sequence_status !== 'active') {
     await pool.execute(
+      "UPDATE scheduled_emails SET status='skipped' WHERE id=?",
+      [row.id],
+    );
+    await pool.execute(
       'INSERT INTO send_logs (scheduled_email_id, mailbox_id, status, message) VALUES (?, ?, ?, ?)',
       [row.id, row.mailbox_id, 'skipped', 'sequence paused'],
     );
@@ -91,8 +95,24 @@ export async function processSendJob(job: Job<SendJob>): Promise<void> {
     );
     throw new Error(`rate_limited:${check.reason}`);
   }
+  const [seqRow] = await pool.execute<RowDataPacket[]>(
+    'SELECT status FROM sequences WHERE id = ? LIMIT 1',
+    [row.sequence_id],
+  );
 
+  if (seqRow[0]?.status !== 'active') {
 
+    await pool.execute(
+      "UPDATE scheduled_emails SET status='skipped' WHERE id=?",
+      [row.id],
+    );
+
+    await pool.execute(
+      'INSERT INTO send_logs (scheduled_email_id, mailbox_id, status, message) VALUES (?, ?, ?, ?)',
+      [row.id, row.mailbox_id, 'skipped', 'sequence paused'],
+    );
+    return;
+  }
   try {
     await send({
       from: row.mailbox_email,
