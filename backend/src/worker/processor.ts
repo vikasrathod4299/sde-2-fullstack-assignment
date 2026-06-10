@@ -84,10 +84,6 @@ export async function processSendJob(job: Job<SendJob>): Promise<void> {
     throw new Error(`rate_limited:${check.reason}`);
   }
 
-  await pool.execute(
-    'INSERT INTO send_logs (scheduled_email_id, mailbox_id, status, message) VALUES (?, ?, ?, ?)',
-    [row.id, row.mailbox_id, 'sent', 'Email dispatched'],
-  );
 
   try {
     await send({
@@ -96,10 +92,17 @@ export async function processSendJob(job: Job<SendJob>): Promise<void> {
       subject: row.subject,
       body: row.body,
     });
+
     await pool.execute(
       "UPDATE scheduled_emails SET status='sent', sent_at=NOW() WHERE id = ?",
       [row.id],
     );
+
+    await pool.execute(
+      'INSERT INTO send_logs (scheduled_email_id, mailbox_id, status, message) VALUES (?, ?, ?, ?)',
+      [row.id, row.mailbox_id, 'sent', 'Email dispatched'],
+    );
+
   } catch (err) {
     const message = (err as Error).message;
     await pool.execute(
