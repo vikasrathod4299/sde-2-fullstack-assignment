@@ -63,6 +63,31 @@ router.post('/:id/steps', async (req: AuthedRequest, res) => {
   res.status(201).json({ id: result.insertId });
 });
 
+
+const prospectSchema = z.object({
+  name: z.string(),
+  email: z.string(),
+  status: z.enum(['active', 'unsubscribed', 'bounced'])
+})
+router.get("/:id/prospects", async (req: AuthedRequest, res) => {
+  const seq = await getSequenceForUser(Number(req.params.id), req.userId!);
+  if (!seq) return res.status(404).json({ error: 'not_found' });
+  return res.json(await getProspects(seq.id))
+});
+ 
+router.post("/:id/prospect", async (req: AuthedRequest, res) => {
+  const seq = await getSequenceForUser(Number(req.params.id), req.userId!);
+  if (!seq) return res.status(404).json({ error: 'not_found' })
+  const parsed = prospectSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'invalid_input' });
+  const { name, email, status } = parsed.data;
+  const [result] = await pool.execute<ResultSetHeader>(
+    'INSERT INTO prospects (name, email, status, sequence_id) VALUES (?, ?, ?, ?)',
+    [name, email, status, seq.id],
+  );
+  res.status(201).json({ id: result.insertId });
+});
+
 router.get('/:id/scheduled-emails', async (req: AuthedRequest, res) => {
   const seq = await getSequenceForUser(Number(req.params.id), req.userId!);
   if (!seq) return res.status(404).json({ error: 'not_found' });
@@ -104,6 +129,7 @@ router.post('/:id/resume', async (req: AuthedRequest, res) => {
   const result = await resumeSequence(seq.id);
   res.json({ ok: true, ...result });
 });
+
 
 // Used by the sequence-detail panel to refresh a single email's status.
 const scheduledEmailRouter = Router();
