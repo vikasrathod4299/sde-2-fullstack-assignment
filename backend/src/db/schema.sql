@@ -70,12 +70,18 @@ CREATE TABLE scheduled_emails (
   step_id      INT UNSIGNED NOT NULL,
   prospect_id  INT UNSIGNED NOT NULL,
   mailbox_id   INT UNSIGNED NOT NULL,
+  processing_time DATETIME NULL,
   scheduled_at DATETIME NOT NULL,
   status       ENUM('pending','processing','sent','failed','skipped') NOT NULL DEFAULT 'pending',
   attempts     INT NOT NULL DEFAULT 0,
   last_error   VARCHAR(500) NULL,
   sent_at      DATETIME NULL,
   PRIMARY KEY (id),
+  UNIQUE KEY se_unique_step_prospect (
+    sequence_id,
+    step_id,
+    prospect_id
+  ),
   KEY se_status_time_idx (status, scheduled_at),
   KEY se_seq_status_idx (sequence_id, status),
   KEY se_mailbox_sent_idx (mailbox_id, sent_at),
