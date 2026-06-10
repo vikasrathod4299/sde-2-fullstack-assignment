@@ -79,6 +79,7 @@ router.get('/:id/scheduled-emails', async (req: AuthedRequest, res) => {
 
 router.post('/:id/schedule', async (req: AuthedRequest, res) => {
   const seq = await getSequenceForUser(Number(req.params.id), req.userId!);
+  if (seq?.status === "paused") return res.status(400).json('sequence_paused')
   if (!seq) return res.status(404).json({ error: 'not_found' });
   const result = await scheduleSequence({ sequenceId: seq.id });
   res.json(result);
