@@ -54,6 +54,14 @@ export async function processSendJob(job: Job<SendJob>): Promise<void> {
     return;
   }
 
+  if (row.sequence_status !== 'active') {
+    await pool.execute(
+      'INSERT INTO send_logs (scheduled_email_id, mailbox_id, status, message) VALUES (?, ?, ?, ?)',
+      [row.id, row.mailbox_id, 'skipped', 'sequence paused'],
+    );
+    return;
+  }
+
   if (row.prospect_status !== 'active') {
     await pool.execute(
       "UPDATE scheduled_emails SET status='skipped' WHERE id=?",
