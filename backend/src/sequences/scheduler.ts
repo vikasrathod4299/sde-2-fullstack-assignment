@@ -39,7 +39,7 @@ export async function scheduleSequence(opts: ScheduleOpts): Promise<ScheduleResu
     }
 
     // Walk every step for this prospect.
-    for (let i = 1; i <= steps.length; i++) {
+    for (let i = 0; i < steps.length; i++) {
       try {
         const step = steps[i];
         const delayMs = step.delay_days * 24 * 60 * 60 * 1000;
