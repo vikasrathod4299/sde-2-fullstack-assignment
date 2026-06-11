@@ -57,8 +57,8 @@ export async function checkAndIncrement(mailboxId: number): Promise<CheckResult>
   const dailyCount = parseInt(dailyRaw ?? '0', 10);
   const hourlyCount = parseInt(hourlyRaw ?? '0', 10);
 
-  if (dailyCount > mailbox.daily_limit) return { allowed: false, reason: 'daily' };
-  if (hourlyCount > mailbox.hourly_limit) return { allowed: false, reason: 'hourly' };
+  if (dailyCount >= mailbox.daily_limit) return { allowed: false, reason: 'daily' };
+  if (hourlyCount >= mailbox.hourly_limit) return { allowed: false, reason: 'hourly' };
 
 
   const results = await redis
