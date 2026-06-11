@@ -11,6 +11,7 @@ interface ScheduleOpts {
   sequenceId: number;
   /** When to start scheduling from. Defaults to now. */
   from?: Date;
+  mailboxId?: number
 }
 
 interface ScheduleResult {
@@ -27,7 +28,7 @@ export async function scheduleSequence(opts: ScheduleOpts): Promise<ScheduleResu
 
   const steps = await getSteps(sequenceId);
   const prospects = await getProspects(sequenceId);
-  const mailboxId = await pickMailboxForSequence(sequenceId);
+  const mailboxId = opts.mailboxId ?? await pickMailboxForSequence(sequenceId);
 
   let scheduled = 0;
   let skipped = 0;
@@ -115,7 +116,6 @@ async function pickMailboxForSequence(sequenceId: number): Promise<number> {
 
 export async function cancelDelayedJobs(sequenceId: number): Promise<number> {
   const jobs = await sendQueue.getDelayed(0, 5000);
-
   let cancelled = 0;
 
   const scheduledEmails = jobs.map(job => job.data?.scheduledEmailId).filter((id): id is number => id !== undefined)
