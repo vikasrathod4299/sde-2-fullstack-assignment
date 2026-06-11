@@ -70,7 +70,6 @@ CREATE TABLE scheduled_emails (
   step_id      INT UNSIGNED NOT NULL,
   prospect_id  INT UNSIGNED NOT NULL,
   mailbox_id   INT UNSIGNED NOT NULL,
-  processing_time DATETIME NULL,
   scheduled_at DATETIME NOT NULL,
   status       ENUM('pending','processing','sent','failed','skipped') NOT NULL DEFAULT 'pending',
   attempts     INT NOT NULL DEFAULT 0,

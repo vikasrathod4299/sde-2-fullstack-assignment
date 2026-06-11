@@ -8,6 +8,7 @@ interface SendJob {
   scheduledEmailId: number;
 }
 
+
 interface JoinedRow extends RowDataPacket {
   id: number;
   sequence_id: number;
@@ -56,12 +57,8 @@ export async function processSendJob(job: Job<SendJob>): Promise<void> {
 
   if (row.sequence_status !== 'active') {
     await pool.execute(
-      "UPDATE scheduled_emails SET status='skipped' WHERE id=?",
-      [row.id],
-    );
-    await pool.execute(
       'INSERT INTO send_logs (scheduled_email_id, mailbox_id, status, message) VALUES (?, ?, ?, ?)',
-      [row.id, row.mailbox_id, 'skipped', 'sequence paused'],
+      [row.id, row.mailbox_id, 'paused', 'sequence paused'],
     );
     return;
   }
@@ -96,21 +93,20 @@ export async function processSendJob(job: Job<SendJob>): Promise<void> {
     );
     throw new Error(`rate_limited:${check.reason}`);
   }
+
   const [seqRow] = await pool.execute<RowDataPacket[]>(
     'SELECT status FROM sequences WHERE id = ? LIMIT 1',
     [row.sequence_id],
   );
 
   if (seqRow[0]?.status !== 'active') {
-
     await pool.execute(
-      "UPDATE scheduled_emails SET status='skipped' WHERE id=?",
+      "UPDATE scheduled_emails SET status='pending' WHERE id=?",
       [row.id],
     );
-
     await pool.execute(
       'INSERT INTO send_logs (scheduled_email_id, mailbox_id, status, message) VALUES (?, ?, ?, ?)',
-      [row.id, row.mailbox_id, 'skipped', 'sequence paused'],
+      [row.id, row.mailbox_id, 'paused', 'sequence paused'],
     );
     return;
   }
@@ -132,6 +128,8 @@ export async function processSendJob(job: Job<SendJob>): Promise<void> {
       [row.id, row.mailbox_id, 'sent', 'Email dispatched'],
     );
 
+    await markSequenceCompletedIfFinished(row.sequence_id)
+
     return;
   } catch (err) {
     const message = (err as Error).message;
@@ -140,5 +138,29 @@ export async function processSendJob(job: Job<SendJob>): Promise<void> {
       [message, row.id],
     );
     throw err;
+  }
+}
+
+export async function markSequenceCompletedIfFinished(
+  sequenceId: number,
+): Promise<void> {
+  const [rows] = await pool.execute<RowDataPacket[]>(
+    `SELECT COUNT(*) AS pending_count
+       FROM scheduled_emails
+      WHERE sequence_id = ?
+        AND status IN ('pending', 'processing')`,
+    [sequenceId],
+  );
+
+  const pendingCount = rows[0]?.pending_count ?? 0;
+
+  if (pendingCount === 0) {
+    await pool.execute(
+      `UPDATE sequences
+          SET status = 'completed'
+        WHERE id = ?
+          AND status != 'completed'`,
+      [sequenceId],
+    );
   }
 }

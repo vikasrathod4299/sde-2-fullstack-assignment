@@ -107,7 +107,18 @@ router.post('/:id/schedule', async (req: AuthedRequest, res) => {
 
   const seq = await getSequenceForUser(Number(req.params.id), req.userId!);
   if (!seq) return res.status(404).json({ error: 'not_found' });
+  if (seq.status === "active") {
+    return res.status(400).json({ error: 'sequence_already_active' })
+  }
   const result = await scheduleSequence({ sequenceId: seq.id, mailboxId: mailboxId ? Number(mailboxId) : undefined });
+
+  // make darft or pending sequences active
+  await pool.execute(
+    `UPDATE sequences
+     SET status = ?
+     WHERE id = ?`,
+    ['active', seq.id]
+  );
   res.json(result);
 });
 
