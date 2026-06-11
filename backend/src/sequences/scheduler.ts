@@ -115,17 +115,30 @@ async function pickMailboxForSequence(sequenceId: number): Promise<number> {
 
 export async function cancelDelayedJobs(sequenceId: number): Promise<number> {
   const jobs = await sendQueue.getDelayed(0, 5000);
+
   let cancelled = 0;
+
+  const scheduledEmails = jobs.map(job => job.data?.scheduledEmailId).filter((id): id is number => id !== undefined)
+  if (scheduledEmails.length === 0) return 0;
+
+  const placeholders = scheduledEmails.map(() => '?').join(',')
+
+  const [rows] = await pool.execute<RowDataPacket[]>(
+    `SELECT id, sequence_id FROM scheduled_emails WHERE id IN (${placeholders})`,
+    scheduledEmails
+  )
+
+  const sequenceMap = new Map<number, number>();
+
+  for (const row of rows) {
+    sequenceMap.set(row.id as number, row.sequence_id as number)
+  }
+
   for (const job of jobs) {
-    const seId = job.data?.scheduledEmailId as number | undefined;
-    if (!seId) continue;
-    const [rows] = await pool.execute<RowDataPacket[]>(
-      'SELECT sequence_id FROM scheduled_emails WHERE id = ? LIMIT 1',
-      [seId],
-    );
-    if (rows[0]?.sequence_id === sequenceId) {
+    const seId = job.data?.scheduledemailid;
+    if (seId && sequenceMap.get(seId) === sequenceId) {
       await job.remove();
-      cancelled++;
+      cancelled++
     }
   }
   return cancelled;
