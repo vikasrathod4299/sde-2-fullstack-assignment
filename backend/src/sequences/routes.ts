@@ -104,7 +104,6 @@ router.get('/:id/scheduled-emails', async (req: AuthedRequest, res) => {
 
 router.post('/:id/schedule', async (req: AuthedRequest, res) => {
   const { mailboxId } = req.query;
-
   const seq = await getSequenceForUser(Number(req.params.id), req.userId!);
   if (!seq) return res.status(404).json({ error: 'not_found' });
   if (seq.status === "active") {
