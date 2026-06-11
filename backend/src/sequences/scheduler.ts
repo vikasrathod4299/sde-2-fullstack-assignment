@@ -3,6 +3,7 @@ import { Queue } from 'bullmq';
 import { bullConnection } from '../config/redis';
 import { getSteps, getProspects, setSequenceStatus, type Step } from './service';
 import type { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { remainingBudget } from '../mailboxes/rateLimiter';
 
 export const SEND_QUEUE = 'email-send';
 export const sendQueue = new Queue(SEND_QUEUE, { connection: bullConnection });
@@ -82,6 +83,13 @@ export async function scheduleSequence(opts: ScheduleOpts): Promise<ScheduleResu
   return { scheduled, skipped };
 }
 
+interface PendingEmails extends RowDataPacket {
+  id: number;
+  prospect_id: number;
+  delay_days: number;
+  step_order: number;
+  mailbox_id: number;
+}
 /**
  * Resume a paused sequence: pick remaining pending emails and re-enqueue
  * them spaced by the configured step delays from "now". (This is partial —
@@ -94,7 +102,97 @@ export async function resumeSequence(sequenceId: number): Promise<ScheduleResult
   //  - bucket them by prospect; the first one in each bucket fires after
   //    step1.delay_days from now, subsequent ones cascade by their step delay
   //  - respect remainingBudget() per mailbox so we don't queue past today's quota
-  void sequenceId;
+
+
+  const [rows] = await pool.execute<PendingEmails[]>(
+    `SELECT se.id,
+            se.prospect_id,
+            se.mailbox_id,
+            ss.delay_days,
+            ss.step_order
+       FROM scheduled_emails se
+       JOIN sequence_steps ss ON ss.id = se.step_id
+      WHERE se.sequence_id = ?
+        AND se.status = 'pending'
+      ORDER BY se.prospect_id ASC, ss.step_order ASC`,
+    [sequenceId],
+  );
+  if (rows.length === 0) {
+    return { scheduled: 0, skipped: 0 }
+  }
+  const mailboxId = rows[0].mailbox_id;
+  const budget = await remainingBudget(mailboxId);
+
+  let remainingToday = budget?.daily ?? 100;
+
+  const byProspect = new Map<number, PendingEmails[]>();
+
+  for (const row of rows) {
+    const bucket = byProspect.get(row.prospect_id) ?? []
+    bucket.push(row);
+    byProspect.set(row.prospect_id, bucket);
+  }
+
+  let scheduled = 0;
+  let skipped = 0;
+
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const now = Date.now();
+
+  for (const emails of byProspect.values()) {
+    let cumulativeDays = 0;
+    for (const email of emails) {
+      cumulativeDays += email.delay_days;
+
+      let scheduledAt = new Date(
+        now + cumulativeDays * DAY_MS
+      );
+
+      if (remainingToday > 0) {
+        remainingToday--;
+      } else {
+        scheduledAt = new Date(scheduledAt.getTime() + DAY_MS);
+      }
+
+      try {
+
+        await pool.execute(
+          `UPDATE scheduled_emails
+              SET scheduled_at = ?
+            WHERE id = ?`,
+          [scheduledAt, email.id],
+        );
+
+        const delay = Math.max(
+          0,
+          scheduledAt.getTime() - Date.now(),
+        );
+
+        await sendQueue.add(
+          'send',
+          { scheduledEmailId: email.id },
+          {
+            delay,
+            jobId: `se-${email.id}`,
+            attempts: 3,
+            backoff: {
+              type: "exponential",
+              delay: 5000
+            }
+          },
+        );
+
+        scheduled++;
+      } catch (err) {
+        console.error(
+          `[resume] failed to schedule email ${email.id}:`,
+          (err as Error).message,
+        );
+        skipped++;
+      }
+    }
+  }
+
   return { scheduled: 0, skipped: 0 };
 }
 
