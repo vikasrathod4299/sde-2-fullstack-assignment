@@ -43,6 +43,7 @@ export async function getMailbox(mailboxId: number): Promise<Mailbox | null> {
  * increment the counter. Returns { allowed: false } when a limit would be
  * crossed.
  */
+// TODO should this should be atomic with multi or lua script
 export async function checkAndIncrement(mailboxId: number): Promise<CheckResult> {
   const mailbox = await getMailbox(mailboxId);
   if (!mailbox) return { allowed: false, reason: 'daily' };
@@ -52,18 +53,25 @@ export async function checkAndIncrement(mailboxId: number): Promise<CheckResult>
 
   const dailyRaw = await redis.get(dKey);
   const hourlyRaw = await redis.get(hKey);
+
   const dailyCount = parseInt(dailyRaw ?? '0', 10);
   const hourlyCount = parseInt(hourlyRaw ?? '0', 10);
 
   if (dailyCount > mailbox.daily_limit) return { allowed: false, reason: 'daily' };
   if (hourlyCount > mailbox.hourly_limit) return { allowed: false, reason: 'hourly' };
 
-  const newDaily = await redis.incr(dKey);
-  if (newDaily === 1) await redis.expire(dKey, 86400);
 
-  const newHourly = await redis.incr(hKey);
-  if (newHourly === 1) await redis.expire(hKey, 3600);
+  const results = await redis
+    .multi()
+    .incr(dKey)
+    .expire(dKey, 86400)
+    .incr(hKey)
+    .expire(hKey, 3600)
+    .exec();
 
+  if (!results) {
+    throw new Error("Failed to update rate limit counter")
+  }
   return { allowed: true };
 }
 
