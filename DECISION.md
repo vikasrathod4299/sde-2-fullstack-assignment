@@ -46,6 +46,12 @@ There is still a small failure window between a successful SMTP send and the sub
 
 In a production system I would address this with idempotency mechanisms such as provider message IDs, deduplication keys, or an outbox-style workflow. I did not implement those protections here because they add significant complexity and were outside the scope of the assignment.
 
+### Mailbox Quota Refresh Strategy
+
+I initially implemented the quota dashboard using polling because it was the simplest approach. After revisiting the design, I realized polling would continue fetching data at a fixed interval even when quota values had not changed.
+
+I switched to SSE so updates are pushed only when quota data changes. My first attempt still relied on a server-side interval because the worker and API run as separate processes, which meant an in-memory EventEmitter could not be used for cross-process communication. To make the updates truly event-driven, I used Redis Pub/Sub. The worker publishes a quota update event after incrementing counters, and connected SSE clients receive fresh data only when a change occurs, avoiding the continuous polling behavior.
+
 ## What I Would Change With Another Day
 
 - Add a lease/recovery mechanism for emails stuck in `processing`.

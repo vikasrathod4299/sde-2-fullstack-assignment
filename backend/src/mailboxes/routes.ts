@@ -2,10 +2,55 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/db';
 import { requireAuth, AuthedRequest } from '../auth/middleware';
-import { readQuota } from './rateLimiter';
+import { getAllMailboxQuotasForUser, readQuota } from './rateLimiter';
 import type { RowDataPacket, ResultSetHeader } from 'mysql2';
+import jwt from 'jsonwebtoken'
+import { env } from '../config/env';
+import { redis } from '../config/redis';
 
 const router = Router();
+
+router.get('/quota/stream', async (req, res) => {
+  const token = req.query.token as string;
+  if (!token) return res.status(401).end();
+
+  try {
+    const payload = jwt.verify(token, env.jwtSecret) as { sub: number | undefined };
+    if (!payload.sub) return res.status(401).end()
+
+    const userId = payload.sub;
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    const sendSnapshot = async () => {
+      const quotas = await getAllMailboxQuotasForUser(userId);
+      res.write(`data: ${JSON.stringify(quotas)}\n\n`);
+    };
+
+    await sendSnapshot();
+
+    const subscriber = redis.duplicate();
+
+    await subscriber.subscribe('quota-changed');
+
+    subscriber.on('message', async (channel, _) => {
+      if (channel === 'quota-changed') await sendSnapshot();
+    });
+
+    req.on('close', async () => {
+      await subscriber.unsubscribe('quota-changed');
+      subscriber.disconnect();
+    })
+  } catch (err) {
+    console.log(err)
+    return res.status(401).end();
+  }
+
+});
+
 router.use(requireAuth);
 
 router.get('/', async (req: AuthedRequest, res) => {

@@ -2,6 +2,7 @@ import { redis } from '../config/redis';
 import { pool } from '../config/db';
 import type { RowDataPacket } from 'mysql2';
 
+
 export interface Mailbox {
   id: number;
   user_id: number;
@@ -72,6 +73,10 @@ export async function checkAndIncrement(mailboxId: number): Promise<CheckResult>
   if (!results) {
     throw new Error("Failed to update rate limit counter")
   }
+
+  const count = await redis.publish('quota-changed', String(mailboxId))
+  console.log('published to', count, 'subscribers', mailboxId);
+
   return { allowed: true };
 }
 
@@ -123,4 +128,12 @@ export async function remainingBudget(mailboxId: number): Promise<{
     daily: Math.max(0, snapshot.daily.limit - snapshot.daily.used),
     hourly: Math.max(0, snapshot.hourly.limit - snapshot.hourly.used),
   };
+}
+
+export async function getAllMailboxQuotasForUser(userId: number): Promise<QuotaSnapshot[]> {
+  const [rows] = await pool.execute<RowDataPacket[]>(
+    'SELECT id FROM mailboxes WHERE user_id = ?',
+    [userId]
+  )
+  return Promise.all(rows.map(row => readQuota(row.id))).then((res) => res.filter((quota): quota is QuotaSnapshot => quota !== null))
 }
