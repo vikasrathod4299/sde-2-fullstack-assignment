@@ -1,4 +1,4 @@
-import { createFileRoute, redirect, Outlet, Link } from '@tanstack/react-router';
+import { createFileRoute, redirect, Outlet, Link, useNavigate } from '@tanstack/react-router';
 import { useAuth } from '@/hooks/use-auth';
 import {
   Sidebar,
@@ -38,6 +38,12 @@ export const Route = createFileRoute('/_authenticated')({
 
 function DashboardLayout() {
   const { profile, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate({ to: '/login' });
+  };
 
   return (
     <SidebarProvider>
@@ -84,7 +90,7 @@ function DashboardLayout() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="h-10 w-auto flex items-center gap-3 px-2 hover:bg-accent rounded-full border-none">
                   <div className="flex flex-col text-right hidden sm:flex">
-                    <span className="text-sm font-medium leading-none">{profile?.name || 'User'}</span>
+                    <span className="text-sm font-medium leading-none">{profile?.email.split('@')[0] || 'User'}</span>
                     <span className="text-xs text-muted-foreground leading-none mt-1">{profile?.email}</span>
                   </div>
                   <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
@@ -95,7 +101,7 @@ function DashboardLayout() {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer" onClick={() => logout()}>
+                <DropdownMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer" onClick={handleLogout}>
                   Logout
                 </DropdownMenuItem>
               </DropdownMenuContent>

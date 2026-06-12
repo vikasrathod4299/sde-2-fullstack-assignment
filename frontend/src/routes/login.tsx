@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { Eye, EyeOff } from 'lucide-react';
 
 export const Route = createFileRoute('/login')({
   beforeLoad: () => {
@@ -20,6 +21,7 @@ export const Route = createFileRoute('/login')({
 function LoginComponent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const login = useAuth((state) => state.login);
   const navigate = Route.useNavigate();
 
@@ -37,8 +39,8 @@ function LoginComponent() {
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        const errorMessage = data.error === 'invalid_credentials' 
-          ? 'Invalid email or password' 
+        const errorMessage = data.error === 'invalid_credentials'
+          ? 'Invalid email or password'
           : (data.message || 'Login failed');
         throw new Error(errorMessage);
       }
@@ -64,11 +66,8 @@ function LoginComponent() {
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 tracking-tight">
-          Welcome back
+          Welcome back to <span className='text-blue-500 italic'>Salescandy</span>
         </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Sign in to your account
-        </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
@@ -98,19 +97,27 @@ function LoginComponent() {
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                 Password
               </label>
-              <div className="mt-1">
+              <div className="mt-1 relative">
                 <Input
                   id="password"
                   name="password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm h-12"
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm h-12 pe-10"
                   placeholder="••••••••"
                   disabled={loginMutation.isPending}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
             </div>
 
