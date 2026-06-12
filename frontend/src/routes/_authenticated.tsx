@@ -1,20 +1,20 @@
 import { createFileRoute, redirect, Outlet, Link } from '@tanstack/react-router';
 import { useAuth } from '@/hooks/use-auth';
-import { 
-  Sidebar, 
-  SidebarContent, 
-  SidebarGroup, 
-  SidebarGroupContent, 
-  SidebarGroupLabel, 
-  SidebarMenu, 
-  SidebarMenuButton, 
-  SidebarMenuItem, 
-  SidebarProvider, 
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
   SidebarInset,
   SidebarTrigger,
   SidebarHeader
 } from '@/components/ui/sidebar';
-import { InboxIcon, LayersIcon } from 'lucide-react';
+import { InboxIcon, LayersIcon, LucideCandy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -38,14 +38,14 @@ export const Route = createFileRoute('/_authenticated')({
 
 function DashboardLayout() {
   const { profile, logout } = useAuth();
-  
+
   return (
     <SidebarProvider>
       <Sidebar>
-        <SidebarHeader className="h-14 border-b border-sidebar-border flex items-center px-4">
-          <div className="flex items-center gap-2">
-            <div className="h-6 w-6 bg-primary rounded-md"></div>
-            <span className="font-semibold text-lg">Saleshandy</span>
+        <SidebarHeader className="h-14 border-b border-sidebar-border flex items-start justify-center px-4">
+          <div className="flex ms-2 items-center gap-2">
+            <LucideCandy className='text-blue-500 text-3xl' />
+            <span className="font-bold text-xl">Salescandy</span>
           </div>
         </SidebarHeader>
         <SidebarContent>
@@ -78,7 +78,6 @@ function DashboardLayout() {
         <header className="flex h-14 items-center gap-4 border-b bg-background px-6 justify-between">
           <div className="flex items-center gap-4">
             <SidebarTrigger />
-            <h1 className="font-semibold hidden sm:block">Email Sequence Scheduler</h1>
           </div>
           <div className="flex items-center gap-4">
             <DropdownMenu>
